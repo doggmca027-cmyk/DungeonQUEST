@@ -65,6 +65,15 @@ function Tasks() {
     setError(null)
     setNotice(null)
     try {
+      const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
+        'verify-subscription',
+        { body: { task_id: task.id } },
+      )
+      if (verifyErr) throw verifyErr
+      if (!verifyData?.subscribed) {
+        throw new Error(verifyData?.message ?? 'Вы не подписаны на канал')
+      }
+
       const { data: reward, error: rpcErr } = await supabase.rpc('complete_task', {
         p_task_id: task.id,
       })
