@@ -56,7 +56,8 @@ function DungeonList() {
 
         await refresh()
       } catch (err) {
-        if (!cancelled) setError(err.message)
+        console.error('Failed to load dungeons:', err)
+        if (!cancelled) setError(err.message ?? 'Не удалось загрузить подземелья')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -141,6 +142,10 @@ function DungeonList() {
 
       {loading ? (
         <p className="text-sm text-theme-dark-text/70">Загрузка подземелий…</p>
+      ) : dungeons.length === 0 ? (
+        <div className="bg-theme-card border border-theme-card-border rounded-2xl p-5 text-center">
+          <p className="text-sm text-theme-dark-text/70">Нет доступных подземелий</p>
+        </div>
       ) : (
         dungeons.map((dungeon) => {
           const group = expeditionGroups[dungeon.id] ?? []

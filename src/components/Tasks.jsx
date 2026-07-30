@@ -15,12 +15,25 @@ function Tasks() {
 
   const refresh = useCallback(async () => {
     if (!user) return
-    const [{ data: tasksData, error: tasksErr }, { data: userTasksData, error: userTasksErr }] = await Promise.all([
-      supabase.from('tasks').select('*').eq('is_active', true),
-      supabase.from('user_tasks').select('task_id').eq('user_id', user.id),
-    ])
+
+    let { data: tasksData, error: tasksErr } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('is_active', true)
+
+    if (tasksErr?.code === '42703') {
+      // is_active column doesn't exist yet (pending migration) — fall back
+      // to fetching every task instead of hard-failing the whole tab.
+      ;({ data: tasksData, error: tasksErr } = await supabase.from('tasks').select('*'))
+    }
     if (tasksErr) throw tasksErr
+
+    const { data: userTasksData, error: userTasksErr } = await supabase
+      .from('user_tasks')
+      .select('task_id')
+      .eq('user_id', user.id)
     if (userTasksErr) throw userTasksErr
+
     setTasks(tasksData ?? [])
     setCompletedIds(new Set((userTasksData ?? []).map((row) => row.task_id)))
   }, [user])

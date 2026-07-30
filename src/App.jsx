@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Home, Swords, ClipboardList, Wallet as WalletIcon, Users, ShieldAlert } from 'lucide-react'
+import { Home as HomeIcon, Swords, ClipboardList, Wallet as WalletIcon, Users, ShieldAlert } from 'lucide-react'
 import { supabase, setAuthToken } from './supabaseClient'
+import Home from './components/Home.jsx'
 import DungeonList from './components/DungeonList.jsx'
 import Wallet from './components/Wallet.jsx'
 import Guild from './components/Guild.jsx'
@@ -13,7 +14,7 @@ const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 const ADMIN_TG_ID = import.meta.env.VITE_ADMIN_TG_ID
 
 const TABS = [
-  { id: 'home', label: 'Главная', icon: Home },
+  { id: 'home', label: 'Главная', icon: HomeIcon },
   { id: 'expedition', label: 'Поход', icon: Swords },
   { id: 'quests', label: 'Задания', icon: ClipboardList },
   { id: 'wallet', label: 'Кошелёк', icon: WalletIcon },
@@ -117,14 +118,7 @@ function App() {
         ) : activeTab === 'admin' ? (
           <AdminPanel />
         ) : (
-          <div className="bg-theme-card border border-theme-card-border rounded-2xl p-5 min-h-[60vh]">
-            <h2 className="text-lg font-semibold mb-2">
-              {tabs.find((t) => t.id === activeTab)?.label}
-            </h2>
-            <p className="text-theme-dark-text/70 text-sm">
-              Раздел «{tabs.find((t) => t.id === activeTab)?.label}» скоро будет наполнен контентом.
-            </p>
-          </div>
+          <Home onNavigateToExpedition={() => setActiveTab('expedition')} />
         )}
       </main>
 
