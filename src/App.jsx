@@ -6,6 +6,7 @@ import Wallet from './components/Wallet.jsx'
 import Guild from './components/Guild.jsx'
 import Tasks from './components/Tasks.jsx'
 import AdminPanel from './components/AdminPanel.jsx'
+import SupportButton from './components/SupportButton.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
@@ -76,7 +77,10 @@ function App() {
   return (
     <div className="min-h-screen bg-theme-bg flex flex-col text-theme-dark-text">
       <header className="px-4 pt-6 pb-4">
-        <h1 className="text-2xl font-bold">DungeonQuest</h1>
+        <div className="flex items-start justify-between gap-2">
+          <h1 className="text-2xl font-bold">DungeonQuest</h1>
+          <SupportButton />
+        </div>
         {user ? (
           <p className="mt-1 text-sm text-theme-dark-text/70">
             Привет, {user.first_name}
