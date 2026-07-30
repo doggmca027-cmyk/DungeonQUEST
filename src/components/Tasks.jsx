@@ -132,7 +132,7 @@ function Tasks() {
 
               <div className="flex gap-2">
                 <a
-                  href={task.link}
+                  href={task.channel_url}
                   target="_blank"
                   rel="noreferrer"
                   className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card"

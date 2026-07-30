@@ -59,14 +59,14 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const { data: task, error: taskErr } = await admin
       .from('tasks')
-      .select('link')
+      .select('channel_url')
       .eq('id', taskId)
       .single()
     if (taskErr || !task) {
       return jsonResponse({ subscribed: false, message: 'Задание не найдено' }, 404)
     }
 
-    const username = extractUsername(task.link)
+    const username = extractUsername(task.channel_url)
     if (!username) {
       return jsonResponse({ subscribed: false, message: 'Некорректная ссылка на канал' }, 400)
     }
