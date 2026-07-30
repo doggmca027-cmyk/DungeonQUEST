@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import WebApp from '@twa-dev/sdk'
 import { Copy, Check } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+
+const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
 
@@ -18,7 +19,7 @@ function displayName(person) {
 }
 
 function Guild() {
-  const [user] = useState(() => WebApp.initDataUnsafe?.user ?? null)
+  const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [earnings, setEarnings] = useState(0)
   const [referrals, setReferrals] = useState([])
   const [loading, setLoading] = useState(true)

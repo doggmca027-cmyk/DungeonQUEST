@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import WebApp from '@twa-dev/sdk'
 import { supabase } from '../supabaseClient'
+
+const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 function formatCountdown(ms) {
   if (ms <= 0) return 'Поход завершён'
@@ -12,7 +13,7 @@ function formatCountdown(ms) {
 }
 
 function DungeonList() {
-  const [user] = useState(() => WebApp.initDataUnsafe?.user ?? null)
+  const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [dungeons, setDungeons] = useState([])
   const [expeditions, setExpeditions] = useState([])
   const [balance, setBalance] = useState(0)

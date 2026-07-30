@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import WebApp from '@twa-dev/sdk'
 import { supabase } from '../supabaseClient'
+
+const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 function AdminPanel() {
   const [withdrawals, setWithdrawals] = useState([])
@@ -77,7 +78,9 @@ function AdminPanel() {
   }
 
   function handleResetSeason() {
-    WebApp.showConfirm(
+    if (!tg) return
+
+    tg.showConfirm(
       'Точно хотите сбросить сезон? Это действие необратимо.',
       async (confirmed) => {
         if (!confirmed) return

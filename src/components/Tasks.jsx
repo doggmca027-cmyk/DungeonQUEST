@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import WebApp from '@twa-dev/sdk'
 import { ExternalLink, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
+const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
+
 function Tasks() {
-  const [user] = useState(() => WebApp.initDataUnsafe?.user ?? null)
+  const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [tasks, setTasks] = useState([])
   const [completedIds, setCompletedIds] = useState(() => new Set())
   const [loading, setLoading] = useState(true)

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react'
-import WebApp from '@twa-dev/sdk'
 import { supabase } from '../supabaseClient'
+
+const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 const PROJECT_WALLET_ADDRESS = import.meta.env.VITE_PROJECT_WALLET_ADDRESS
 const MIN_WITHDRAWAL_GRAM = 0.5
 const WITHDRAWAL_FEE_RATE = 0.1
 
 function Wallet() {
-  const [user] = useState(() => WebApp.initDataUnsafe?.user ?? null)
+  const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const tonAddress = useTonAddress()
   const [tonConnectUI] = useTonConnectUI()
 

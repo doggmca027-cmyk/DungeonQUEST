@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import WebApp from '@twa-dev/sdk'
 import { Home, Swords, ClipboardList, Wallet as WalletIcon, Users, ShieldAlert } from 'lucide-react'
 import { supabase, setAuthToken } from './supabaseClient'
 import DungeonList from './components/DungeonList.jsx'
@@ -7,6 +6,8 @@ import Wallet from './components/Wallet.jsx'
 import Guild from './components/Guild.jsx'
 import Tasks from './components/Tasks.jsx'
 import AdminPanel from './components/AdminPanel.jsx'
+
+const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 const ADMIN_TG_ID = import.meta.env.VITE_ADMIN_TG_ID
 
@@ -22,9 +23,9 @@ const ADMIN_TAB = { id: 'admin', label: 'Админ-панель', icon: ShieldA
 
 function App() {
   const [activeTab, setActiveTab] = useState('home')
-  const [user] = useState(() => WebApp.initDataUnsafe?.user ?? null)
+  const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [referralId] = useState(() => {
-    const startParam = WebApp.initDataUnsafe?.start_param
+    const startParam = tg?.initDataUnsafe?.start_param
     const referralMatch = startParam?.match(/^ref_(\d+)$/)
     return referralMatch ? referralMatch[1] : null
   })
@@ -34,8 +35,14 @@ function App() {
   const [registerError, setRegisterError] = useState(null)
 
   useEffect(() => {
-    WebApp.ready()
-    WebApp.expand()
+    if (tg) {
+      try {
+        tg.ready()
+        tg.expand()
+      } catch (e) {
+        console.error('Telegram WebApp init error:', e)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -44,7 +51,7 @@ function App() {
 
     async function authenticate() {
       const { data, error } = await supabase.functions.invoke('telegram-auth', {
-        body: { initData: WebApp.initData },
+        body: { initData: tg?.initData },
       })
       if (cancelled) return
       if (error || !data?.token) {
