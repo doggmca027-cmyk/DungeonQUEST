@@ -157,6 +157,7 @@ function DungeonList() {
           const isBusy = busyId === dungeon.id
           const canEnter = !readyToClaim && balance >= dungeon.entry_cost_gram && !isBusy
           const canClaim = readyToClaim && !isBusy
+          const profitPercent = Math.round((dungeon.reward_multiplier - 1) * 100)
 
           return (
             <div
@@ -178,6 +179,9 @@ function DungeonList() {
                 </span>
                 <span className="inline-flex items-center rounded-full bg-theme-bg/15 border border-theme-card-border px-3 py-1 text-xs font-medium text-theme-accent">
                   {dungeon.duration_hours} часов в пути
+                </span>
+                <span className="inline-flex items-center rounded-full bg-theme-bg/15 border border-theme-card-border px-3 py-1 text-xs font-medium text-theme-accent">
+                  Прибыль: +{profitPercent}%
                 </span>
               </div>
 

@@ -22,6 +22,7 @@ function displayName(person) {
 function Guild() {
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [earnings, setEarnings] = useState(0)
+  const [earningsByLevel, setEarningsByLevel] = useState({ 1: 0, 2: 0, 3: 0 })
   const [referrals, setReferrals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -34,12 +35,21 @@ function Guild() {
   const refresh = useCallback(async () => {
     if (!user) return
     const [{ data: userData, error: userErr }, { data: statsData, error: statsErr }] = await Promise.all([
-      supabase.from('users').select('referral_earnings').eq('id', user.id).single(),
+      supabase
+        .from('users')
+        .select('referral_earnings, referral_earnings_l1, referral_earnings_l2, referral_earnings_l3')
+        .eq('id', user.id)
+        .single(),
       supabase.rpc('get_referral_stats'),
     ])
     if (userErr) throw userErr
     if (statsErr) throw statsErr
     setEarnings(userData?.referral_earnings ?? 0)
+    setEarningsByLevel({
+      1: userData?.referral_earnings_l1 ?? 0,
+      2: userData?.referral_earnings_l2 ?? 0,
+      3: userData?.referral_earnings_l3 ?? 0,
+    })
     setReferrals(statsData ?? [])
   }, [user])
 
@@ -130,13 +140,16 @@ function Guild() {
           {LEVELS.map(({ level, rate }) => (
             <div
               key={level}
-              className="rounded-2xl border border-theme-card-border bg-white px-2 py-3 text-center"
+              className="rounded-2xl border border-theme-card-border bg-white px-2 py-3 text-center flex flex-col gap-1"
             >
               <p className="text-xs text-theme-dark-text/60">{level} уровень</p>
               <p className="text-lg font-bold text-theme-dark-text">
                 {loading ? '…' : countsByLevel[level] ?? 0}
               </p>
               <p className="text-xs text-theme-accent font-medium">{rate}</p>
+              <p className="text-xs font-semibold text-theme-dark-text/80 border-t border-theme-card-border pt-1 mt-1">
+                {loading ? '…' : `${earningsByLevel[level] ?? 0} GRAM`}
+              </p>
             </div>
           ))}
         </div>
