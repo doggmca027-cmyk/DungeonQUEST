@@ -6,7 +6,7 @@ import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <TonConnectUIProvider manifestUrl="/tonconnect-manifest.json">
+    <TonConnectUIProvider manifestUrl={`${window.location.origin}/tonconnect-manifest.json`}>
       <App />
     </TonConnectUIProvider>
   </StrictMode>,
