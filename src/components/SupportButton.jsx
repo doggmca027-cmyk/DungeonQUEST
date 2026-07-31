@@ -5,11 +5,21 @@ const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 const SUPPORT_URL = import.meta.env.VITE_SUPPORT_URL
 
 function handleSupportClick() {
-  if (tg?.openTelegramLink) {
-    tg.openTelegramLink(SUPPORT_URL)
-  } else {
-    window.open(SUPPORT_URL, '_blank')
+  if (!SUPPORT_URL) {
+    console.error('VITE_SUPPORT_URL is not set')
+    return
   }
+
+  try {
+    if (typeof tg?.openTelegramLink === 'function') {
+      tg.openTelegramLink(SUPPORT_URL)
+      return
+    }
+  } catch (e) {
+    console.error('openTelegramLink failed:', e)
+  }
+
+  window.open(SUPPORT_URL, '_blank')
 }
 
 function SupportButton() {

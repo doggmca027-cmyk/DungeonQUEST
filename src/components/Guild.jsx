@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient'
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
+const APP_SHORT_NAME = import.meta.env.VITE_TELEGRAM_APP_SHORT_NAME
 
 const LEVELS = [
   { level: 1, rate: '10%' },
@@ -26,7 +27,9 @@ function Guild() {
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const referralLink = user ? `https://t.me/${BOT_USERNAME}?startapp=ref_${user.id}` : ''
+  const referralLink = user
+    ? `https://t.me/${BOT_USERNAME}/${APP_SHORT_NAME}?startapp=ref_${user.id}`
+    : ''
 
   const refresh = useCallback(async () => {
     if (!user) return
