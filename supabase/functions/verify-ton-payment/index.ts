@@ -57,9 +57,12 @@ Deno.serve(async (req) => {
       { headers: { Authorization: `Bearer ${TONAPI_KEY}` } },
     )
     if (!tonRes.ok) {
+      const bodyText = await tonRes.text()
+      console.error('TonAPI request failed:', tonRes.status, bodyText)
       return jsonResponse({ credited: false, pending: true, message: 'TonAPI unavailable' })
     }
     const tonData = await tonRes.json()
+    console.log('TonAPI events fetched:', tonData.events?.length ?? 0)
 
     let match: { txHash: string; amountTon: number } | null = null
 
@@ -89,13 +92,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ credited: false, pending: true })
     }
 
+    console.log('Match found, crediting:', match)
+
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const { data, error: rpcErr } = await admin.rpc('credit_verified_deposit', {
       p_user_id: telegramId,
       p_tx_hash: match.txHash,
       p_amount: match.amountTon,
     })
-    if (rpcErr) throw rpcErr
+    if (rpcErr) {
+      console.error('credit_verified_deposit RPC failed:', JSON.stringify(rpcErr))
+      throw rpcErr
+    }
 
     // already_processed just means an earlier poll already credited this
     // same transaction -- still a "yes, it's credited" from the caller's
@@ -106,6 +114,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ credited: true, amount: match.amountTon })
   } catch (err) {
+    console.error('verify-ton-payment failed:', err instanceof Error ? err.stack : err)
     return jsonResponse(
       { credited: false, message: err instanceof Error ? err.message : 'Ошибка проверки' },
       500,
