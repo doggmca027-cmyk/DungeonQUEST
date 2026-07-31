@@ -104,6 +104,25 @@ function DungeonList() {
     }
   }
 
+  async function handleBoost(expedition, targetHours) {
+    setBusyId(expedition.dungeon_id)
+    setError(null)
+    try {
+      const { data, error: rpcErr } = await supabase.rpc('use_booster', {
+        p_expedition_id: expedition.id,
+        p_target_hours: targetHours,
+      })
+      if (rpcErr) throw rpcErr
+      if (!data?.success) throw new Error(data?.message ?? 'Не удалось ускорить поход')
+
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handleClaim(dungeonId, group) {
     setBusyId(dungeonId)
     setError(null)
@@ -158,6 +177,12 @@ function DungeonList() {
           const canEnter = !readyToClaim && balance >= dungeon.entry_cost_gram && !isBusy
           const canClaim = readyToClaim && !isBusy
 
+          const startMs = inProgress ? new Date(inProgress.start_time).getTime() : null
+          const canBoost6 =
+            inProgress && startMs + 6 * 60 * 60 * 1000 < new Date(inProgress.end_time).getTime()
+          const canBoost9 =
+            inProgress && startMs + 9 * 60 * 60 * 1000 < new Date(inProgress.end_time).getTime()
+
           return (
             <div
               key={dungeon.id}
@@ -187,6 +212,31 @@ function DungeonList() {
                     ? `Лут ждёт: ${totalReward} GRAM`
                     : `В пути, осталось: ${formatCountdown(msLeft)}`}
                 </p>
+              )}
+
+              {(canBoost6 || canBoost9) && (
+                <div className="flex gap-2">
+                  {canBoost6 && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleBoost(inProgress, 6)}
+                      className="flex-1 rounded-2xl px-3 py-2 text-xs font-semibold bg-theme-bg/15 border border-theme-card-border text-theme-accent disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Ускорить до 6ч
+                    </button>
+                  )}
+                  {canBoost9 && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleBoost(inProgress, 9)}
+                      className="flex-1 rounded-2xl px-3 py-2 text-xs font-semibold bg-theme-bg/15 border border-theme-card-border text-theme-accent disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Ускорить до 9ч
+                    </button>
+                  )}
+                </div>
               )}
 
               <div className="flex gap-2">

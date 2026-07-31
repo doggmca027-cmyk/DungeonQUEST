@@ -30,13 +30,32 @@ function AdminPanel() {
   const [taskLink, setTaskLink] = useState('')
   const [taskBusy, setTaskBusy] = useState(false)
 
+  const [minWithdrawal, setMinWithdrawal] = useState('')
+  const [feeRatePercent, setFeeRatePercent] = useState('')
+  const [seasonEndAt, setSeasonEndAt] = useState('')
+  const [settingsBusy, setSettingsBusy] = useState(false)
+
+  const [creditTelegramId, setCreditTelegramId] = useState('')
+  const [creditAmount, setCreditAmount] = useState('')
+  const [creditBusy, setCreditBusy] = useState(false)
+
   const refresh = useCallback(async () => {
-    const { data, error: fetchErr } = await supabase
-      .from('withdrawals')
-      .select('*')
-      .eq('status', 'pending')
+    const [{ data, error: fetchErr }, { data: settingsData, error: settingsErr }] = await Promise.all([
+      supabase.from('withdrawals').select('*').eq('status', 'pending'),
+      supabase.from('app_settings').select('key, value'),
+    ])
     if (fetchErr) throw fetchErr
+    if (settingsErr) throw settingsErr
     setWithdrawals(data ?? [])
+
+    const settings = Object.fromEntries((settingsData ?? []).map((row) => [row.key, row.value]))
+    if (settings.min_withdrawal_gram) setMinWithdrawal(settings.min_withdrawal_gram)
+    if (settings.withdrawal_fee_rate) {
+      setFeeRatePercent(String(Number(settings.withdrawal_fee_rate) * 100))
+    }
+    if (settings.season_end_at) {
+      setSeasonEndAt(new Date(settings.season_end_at).toISOString().slice(0, 16))
+    }
   }, [])
 
   useEffect(() => {
@@ -65,11 +84,12 @@ function AdminPanel() {
     setError(null)
     setNotice(null)
     try {
-      const { error: rpcErr } = await supabase.rpc('approve_withdrawal', {
-        p_withdrawal_id: withdrawal.id,
+      const { data, error: fnErr } = await supabase.functions.invoke('send-withdrawal-payout', {
+        body: { withdrawal_id: withdrawal.id },
       })
-      if (rpcErr) throw rpcErr
-      setNotice('Заявка подтверждена')
+      if (fnErr) throw fnErr
+      if (!data?.success) throw new Error(data?.message ?? 'Не удалось отправить выплату')
+      setNotice('Выплата отправлена, заявка подтверждена')
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -149,6 +169,65 @@ function AdminPanel() {
     }
   }
 
+  async function handleSaveSettings() {
+    setSettingsBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const feeRateDecimal = Number(feeRatePercent) / 100
+      const seasonEndIso = seasonEndAt ? new Date(seasonEndAt).toISOString() : null
+
+      const updates = [
+        ['min_withdrawal_gram', String(Number(minWithdrawal))],
+        ['withdrawal_fee_rate', String(feeRateDecimal)],
+      ]
+      if (seasonEndIso) updates.push(['season_end_at', seasonEndIso])
+
+      for (const [key, value] of updates) {
+        const { error: rpcErr } = await supabase.rpc('update_app_setting', {
+          p_key: key,
+          p_value: value,
+        })
+        if (rpcErr) throw rpcErr
+      }
+
+      setNotice('Настройки сохранены')
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSettingsBusy(false)
+    }
+  }
+
+  async function handleCreditBalance() {
+    const telegramId = Number(creditTelegramId)
+    const amount = Number(creditAmount)
+    if (!telegramId || !amount) {
+      setError('Укажите корректные Telegram ID и сумму')
+      return
+    }
+
+    setCreditBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const { error: rpcErr } = await supabase.rpc('admin_credit_balance', {
+        p_target_telegram_id: telegramId,
+        p_amount: amount,
+      })
+      if (rpcErr) throw rpcErr
+
+      setNotice(`Начислено ${amount} GRAM игроку ${telegramId}`)
+      setCreditTelegramId('')
+      setCreditAmount('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCreditBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 text-left">
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
@@ -200,6 +279,78 @@ function AdminPanel() {
         </div>
       </div>
 
+      <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
+        <h3 className="font-semibold text-base">Настройки</h3>
+        <label className="text-xs text-theme-dark-text/60">
+          Мин. сумма вывода, GRAM
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={minWithdrawal}
+            onChange={(e) => setMinWithdrawal(e.target.value)}
+            className="mt-1 w-full rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm text-theme-dark-text"
+          />
+        </label>
+        <label className="text-xs text-theme-dark-text/60">
+          Комиссия вывода, %
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={feeRatePercent}
+            onChange={(e) => setFeeRatePercent(e.target.value)}
+            className="mt-1 w-full rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm text-theme-dark-text"
+          />
+        </label>
+        <label className="text-xs text-theme-dark-text/60">
+          Конец сезона
+          <input
+            type="datetime-local"
+            value={seasonEndAt}
+            onChange={(e) => setSeasonEndAt(e.target.value)}
+            className="mt-1 w-full rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm text-theme-dark-text"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handleSaveSettings}
+          disabled={settingsBusy}
+          className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {settingsBusy ? 'Сохранение…' : 'Сохранить настройки'}
+        </button>
+      </div>
+
+      <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
+        <h3 className="font-semibold text-base">Выдать баланс</h3>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={creditTelegramId}
+          onChange={(e) => setCreditTelegramId(e.target.value)}
+          placeholder="Telegram ID игрока"
+          className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
+        />
+        <input
+          type="number"
+          step="0.01"
+          value={creditAmount}
+          onChange={(e) => setCreditAmount(e.target.value)}
+          placeholder="Сумма, GRAM"
+          className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={handleCreditBalance}
+          disabled={creditBusy}
+          className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {creditBusy ? 'Начисление…' : 'Начислить'}
+        </button>
+      </div>
+
       {error && (
         <p className="text-sm text-red-700 bg-red-100 border border-red-300 rounded-2xl px-3 py-2">
           {error}
@@ -234,7 +385,9 @@ function AdminPanel() {
                   <span className="font-semibold">{w.amount_gram} GRAM</span>
                 </p>
                 <p className="text-sm">
-                  <span className="text-theme-dark-text/60">К выплате (-10%): </span>
+                  <span className="text-theme-dark-text/60">
+                    К выплате (-{Math.round((1 - w.final_amount / w.amount_gram) * 100)}%):{' '}
+                  </span>
                   <span className="font-semibold text-theme-accent">{w.final_amount} GRAM</span>
                 </p>
                 <p className="text-sm break-all">
@@ -249,7 +402,7 @@ function AdminPanel() {
                     onClick={() => handleApprove(w)}
                     className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Подтвердить
+                    {isBusy ? 'Отправка…' : 'Подтвердить'}
                   </button>
                   <button
                     type="button"
