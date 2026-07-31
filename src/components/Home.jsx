@@ -4,10 +4,16 @@ import { supabase } from '../supabaseClient'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
-const DAILY_REWARDS = [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.5]
+const DAILY_REWARDS = [0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.25]
 
 function todayUtc() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function yesterdayUtc() {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
 }
 
 function formatDuration(ms) {
@@ -115,9 +121,12 @@ function Home({ onNavigateToExpedition }) {
 
   const nearestExpedition = activeExpeditions[0] ?? null
   const claimedToday = checkin?.last_claim_date === todayUtc()
+  const isStreakContinuing = checkin?.last_claim_date === yesterdayUtc()
   const currentStreakDay = claimedToday
     ? checkin.streak_day
-    : Math.min((checkin?.streak_day ?? 0) + 1, 7)
+    : isStreakContinuing
+      ? Math.min(checkin.streak_day + 1, 7)
+      : 1
   const seasonMsLeft = seasonEndAt ? new Date(seasonEndAt).getTime() - now : null
 
   return (

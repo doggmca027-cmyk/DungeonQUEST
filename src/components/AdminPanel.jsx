@@ -6,6 +6,17 @@ const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 // Accepts "https://t.me/username", "t.me/username", or "@username" and
 // returns a canonical "https://t.me/username" link, so task.link is always
 // a valid href for the "Перейти в канал" button.
+// <input type="datetime-local"> always reads/writes in the browser's local
+// timezone with no offset info -- naively slicing an ISO (UTC) string into
+// it, then round-tripping back via `new Date(...).toISOString()`, silently
+// shifts the value by the local UTC offset on every save. This converts the
+// UTC instant into the equivalent local wall-clock string first.
+function toLocalDatetimeInputValue(isoString) {
+  const date = new Date(isoString)
+  const offsetMs = date.getTimezoneOffset() * 60000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
 function normalizeChannelLink(input) {
   if (!input) return null
   const username = input
@@ -54,7 +65,7 @@ function AdminPanel() {
       setFeeRatePercent(String(Number(settings.withdrawal_fee_rate) * 100))
     }
     if (settings.season_end_at) {
-      setSeasonEndAt(new Date(settings.season_end_at).toISOString().slice(0, 16))
+      setSeasonEndAt(toLocalDatetimeInputValue(settings.season_end_at))
     }
   }, [])
 
@@ -170,6 +181,18 @@ function AdminPanel() {
   }
 
   async function handleSaveSettings() {
+    // Guards against zeroing out the fee/minimum if this is clicked before
+    // refresh() has populated the fields (e.g. a click during initial load).
+    if (
+      minWithdrawal === '' ||
+      feeRatePercent === '' ||
+      !Number.isFinite(Number(minWithdrawal)) ||
+      !Number.isFinite(Number(feeRatePercent))
+    ) {
+      setError('Настройки ещё не загружены — подождите и попробуйте снова')
+      return
+    }
+
     setSettingsBusy(true)
     setError(null)
     setNotice(null)
@@ -316,7 +339,7 @@ function AdminPanel() {
         <button
           type="button"
           onClick={handleSaveSettings}
-          disabled={settingsBusy}
+          disabled={settingsBusy || loading}
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {settingsBusy ? 'Сохранение…' : 'Сохранить настройки'}

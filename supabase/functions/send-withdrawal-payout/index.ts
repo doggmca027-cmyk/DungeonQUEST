@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
   let claimedWithdrawalId: string | null = null
+  let transferSent = false
 
   try {
     const payload = decodeJwtPayload(req.headers.get('Authorization'))
@@ -125,6 +126,10 @@ Deno.serve(async (req) => {
         }),
       ],
     })
+    // Money has left the wallet at this point -- from here on, a failure
+    // must NEVER cause the row to revert to 'pending', or a retry would
+    // broadcast a second real payout for the same withdrawal.
+    transferSent = true
 
     const { error: finalizeErr } = await admin
       .from('withdrawals')
@@ -134,16 +139,22 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ success: true })
   } catch (err) {
-    if (claimedWithdrawalId) {
+    if (claimedWithdrawalId && !transferSent) {
+      // Failed before anything was sent -- safe to release the claim so the
+      // admin can retry.
       await admin
         .from('withdrawals')
         .update({ status: 'pending' })
         .eq('id', claimedWithdrawalId)
         .eq('status', 'processing')
     }
-    return jsonResponse(
-      { success: false, message: err instanceof Error ? err.message : 'Ошибка отправки выплаты' },
-      500,
-    )
+
+    const message = transferSent
+      ? 'Выплата УЖЕ ОТПРАВЛЕНА в сеть, но не удалось обновить статус заявки. Не подтверждайте повторно — проверьте транзакцию и статус вручную в базе данных.'
+      : err instanceof Error
+        ? err.message
+        : 'Ошибка отправки выплаты'
+
+    return jsonResponse({ success: false, message }, 500)
   }
 })

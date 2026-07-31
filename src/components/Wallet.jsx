@@ -91,13 +91,23 @@ function Wallet() {
   // Never credits from the client's own report -- polls the backend, which
   // only credits once it independently finds a matching, verified incoming
   // transaction on-chain via TonAPI (see verify-ton-payment Edge Function).
-  const pollForDeposit = useCallback(async (expectedAmount) => {
+  // submittedAt scopes the search to this deposit attempt, so a repeat
+  // deposit for the same amount can't get "confirmed" by matching an older,
+  // already-credited transaction (comment is always just the Telegram ID,
+  // so it alone doesn't distinguish separate deposits).
+  const pollForDeposit = useCallback(async (expectedAmount, submittedAt) => {
     for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-      const { data, error: fnErr } = await supabase.functions.invoke('verify-ton-payment', {
-        body: { expected_amount: expectedAmount },
-      })
-      if (fnErr) throw fnErr
-      if (data?.credited) return true
+      try {
+        const { data, error: fnErr } = await supabase.functions.invoke('verify-ton-payment', {
+          body: { expected_amount: expectedAmount, submitted_at: submittedAt },
+        })
+        if (fnErr) throw fnErr
+        if (data?.credited) return true
+      } catch (err) {
+        // A single transient failure (network blip, cold start) shouldn't
+        // abort the whole 2-minute check -- log it and keep polling.
+        console.error('verify-ton-payment attempt failed:', err)
+      }
       await wait(POLL_INTERVAL_MS)
     }
     return false
@@ -123,7 +133,7 @@ function Wallet() {
         if (cancelled) return
         setVerifying(true)
         setNotice('Проверяем зачисление предыдущей транзакции…')
-        const credited = await pollForDeposit(amount)
+        const credited = await pollForDeposit(amount, submittedAt)
         if (cancelled) return
         if (credited) {
           localStorage.removeItem(PENDING_DEPOSIT_KEY)
@@ -184,14 +194,12 @@ function Wallet() {
       })
       if (!result?.boc) throw new Error('Транзакция не была отправлена')
 
-      localStorage.setItem(
-        PENDING_DEPOSIT_KEY,
-        JSON.stringify({ amount, submittedAt: Date.now() }),
-      )
+      const submittedAt = Date.now()
+      localStorage.setItem(PENDING_DEPOSIT_KEY, JSON.stringify({ amount, submittedAt }))
       setVerifying(true)
       setNotice('Транзакция отправлена в сеть, проверяем зачисление…')
 
-      const credited = await pollForDeposit(amount)
+      const credited = await pollForDeposit(amount, submittedAt)
 
       if (credited) {
         localStorage.removeItem(PENDING_DEPOSIT_KEY)

@@ -38,11 +38,19 @@ Deno.serve(async (req) => {
       return jsonResponse({ credited: false, message: 'Unauthorized' }, 401)
     }
 
-    const { expected_amount: expectedAmount } = await req.json()
+    const { expected_amount: expectedAmount, submitted_at: submittedAt } = await req.json()
     if (!expectedAmount || Number(expectedAmount) <= 0) {
       return jsonResponse({ credited: false, message: 'Missing expected_amount' }, 400)
     }
     const expectedNanotons = Math.round(Number(expectedAmount) * 1e9)
+    // Only consider transactions from this deposit attempt onward -- without
+    // this, a repeat deposit for the same amount (same comment, since it's
+    // always just the Telegram ID) could match an older, already-credited
+    // transaction instead of the new one.
+    const CLOCK_SKEW_BUFFER_SECONDS = 60
+    const sinceSeconds = submittedAt
+      ? Math.floor(Number(submittedAt) / 1000) - CLOCK_SKEW_BUFFER_SECONDS
+      : 0
 
     const tonRes = await fetch(
       `https://tonapi.io/v2/accounts/${PROJECT_WALLET_ADDRESS}/events?limit=50`,
@@ -56,6 +64,8 @@ Deno.serve(async (req) => {
     let match: { txHash: string; amountTon: number } | null = null
 
     for (const event of tonData.events ?? []) {
+      if (typeof event.timestamp === 'number' && event.timestamp < sinceSeconds) continue
+
       for (const action of event.actions ?? []) {
         if (action.type !== 'TonTransfer') continue
         const transfer = action.TonTransfer

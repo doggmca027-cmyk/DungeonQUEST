@@ -178,10 +178,14 @@ function DungeonList() {
           const canClaim = readyToClaim && !isBusy
 
           const startMs = inProgress ? new Date(inProgress.start_time).getTime() : null
-          const canBoost6 =
-            inProgress && startMs + 6 * 60 * 60 * 1000 < new Date(inProgress.end_time).getTime()
-          const canBoost9 =
-            inProgress && startMs + 9 * 60 * 60 * 1000 < new Date(inProgress.end_time).getTime()
+          const endMs = inProgress ? new Date(inProgress.end_time).getTime() : null
+          const sixHourMark = startMs + 6 * 60 * 60 * 1000
+          const nineHourMark = startMs + 9 * 60 * 60 * 1000
+          // Only offer a boost target that's both earlier than the current
+          // end time AND still in the future -- otherwise the player would
+          // pay GRAM for a "boost" that saves zero time.
+          const canBoost6 = inProgress && sixHourMark < endMs && sixHourMark > now
+          const canBoost9 = inProgress && nineHourMark < endMs && nineHourMark > now
 
           return (
             <div
@@ -223,7 +227,7 @@ function DungeonList() {
                       onClick={() => handleBoost(inProgress, 6)}
                       className="flex-1 rounded-2xl px-3 py-2 text-xs font-semibold bg-theme-bg/15 border border-theme-card-border text-theme-accent disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Ускорить до 6ч
+                      Ускорить до 6ч (-25% дохода)
                     </button>
                   )}
                   {canBoost9 && (
@@ -233,7 +237,7 @@ function DungeonList() {
                       onClick={() => handleBoost(inProgress, 9)}
                       className="flex-1 rounded-2xl px-3 py-2 text-xs font-semibold bg-theme-bg/15 border border-theme-card-border text-theme-accent disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Ускорить до 9ч
+                      Ускорить до 9ч (-12.5% дохода)
                     </button>
                   )}
                 </div>
