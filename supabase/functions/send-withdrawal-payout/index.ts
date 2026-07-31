@@ -7,7 +7,7 @@ import {
   WalletContractV3R1,
   internal,
 } from 'npm:@ton/ton@^15'
-import { mnemonicToPrivateKey } from 'npm:@ton/crypto@^3'
+import { mnemonicToPrivateKey, mnemonicValidate } from 'npm:@ton/crypto@^3'
 import { Address, toNano } from 'npm:@ton/core@^0.63.1'
 
 const MNEMONIC = Deno.env.get('PROJECT_WALLET_MNEMONIC')!
@@ -124,6 +124,12 @@ Deno.serve(async (req) => {
 
     const mnemonicWords = MNEMONIC.trim().split(/\s+/)
     console.log('Mnemonic word count:', mnemonicWords.length)
+    // If this comes back false, the phrase isn't a standard native-TON
+    // mnemonic (e.g. it's a BIP39-style export from a hardware/multi-chain
+    // wallet) -- mnemonicToPrivateKey would then silently derive the wrong
+    // keypair even though every word is "correct".
+    const isValidNativeMnemonic = await mnemonicValidate(mnemonicWords)
+    console.log('Native TON mnemonic checksum valid:', isValidNativeMnemonic)
     const keyPair = await mnemonicToPrivateKey(mnemonicWords)
     const wallet = resolveWallet(keyPair.publicKey)
 
