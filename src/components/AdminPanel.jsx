@@ -52,6 +52,9 @@ function AdminPanel() {
   const [creditAmount, setCreditAmount] = useState('')
   const [creditBusy, setCreditBusy] = useState(false)
 
+  const [broadcastText, setBroadcastText] = useState('')
+  const [broadcastBusy, setBroadcastBusy] = useState(false)
+
   const refresh = useCallback(async () => {
     const [{ data, error: fetchErr }, { data: settingsData, error: settingsErr }] = await Promise.all([
       supabase.from('withdrawals').select('*').eq('status', 'pending'),
@@ -253,6 +256,31 @@ function AdminPanel() {
     }
   }
 
+  async function handleBroadcast() {
+    if (!broadcastText.trim()) {
+      setError(t('admin.broadcastValidation'))
+      return
+    }
+
+    setBroadcastBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('broadcast-message', {
+        body: { text: broadcastText.trim() },
+      })
+      if (fnErr) throw fnErr
+      if (!data?.success) throw new Error(data?.message ?? t('admin.broadcastError'))
+
+      setNotice(t('admin.broadcastSuccess', { sent: data.sent, total: data.total }))
+      setBroadcastText('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBroadcastBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 text-left">
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
@@ -373,6 +401,25 @@ function AdminPanel() {
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {creditBusy ? t('admin.crediting') : t('admin.credit')}
+        </button>
+      </div>
+
+      <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
+        <h3 className="font-semibold text-base">{t('admin.broadcastTitle')}</h3>
+        <textarea
+          value={broadcastText}
+          onChange={(e) => setBroadcastText(e.target.value)}
+          placeholder={t('admin.broadcastPlaceholder')}
+          rows={4}
+          className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm resize-none"
+        />
+        <button
+          type="button"
+          onClick={handleBroadcast}
+          disabled={broadcastBusy}
+          className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {broadcastBusy ? t('admin.broadcasting') : t('admin.broadcastSend')}
         </button>
       </div>
 
