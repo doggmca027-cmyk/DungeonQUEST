@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
@@ -20,6 +21,7 @@ function displayName(person) {
 }
 
 function Guild() {
+  const { t } = useLanguage()
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [earnings, setEarnings] = useState(0)
   const [earningsByLevel, setEarningsByLevel] = useState({ 1: 0, 2: 0, 3: 0 })
@@ -88,22 +90,20 @@ function Guild() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      setError('Не удалось скопировать ссылку')
+      setError(t('guild.copyError'))
     }
   }
 
   if (!user) {
     return (
-      <p className="text-sm text-theme-dark-text/70">
-        Откройте приложение через Telegram, чтобы посмотреть гильдию.
-      </p>
+      <p className="text-sm text-theme-dark-text/70">{t('guild.openInTelegram')}</p>
     )
   }
 
   return (
     <div className="flex flex-col gap-4 text-left">
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Реферальная ссылка</h3>
+        <h3 className="font-semibold text-base">{t('guild.referralLinkTitle')}</h3>
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -117,7 +117,7 @@ function Guild() {
             className="shrink-0 flex items-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white"
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
-            {copied ? 'Скопировано' : 'Копировать'}
+            {copied ? t('guild.copied') : t('guild.copy')}
           </button>
         </div>
       </div>
@@ -130,7 +130,7 @@ function Guild() {
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-base">Доход с сети</h3>
+          <h3 className="font-semibold text-base">{t('guild.networkIncome')}</h3>
           <span className="text-xs font-medium text-theme-accent bg-theme-accent/10 px-2.5 py-1 rounded-full">
             {loading ? '…' : `${earnings} GRAM`}
           </span>
@@ -142,7 +142,7 @@ function Guild() {
               key={level}
               className="rounded-2xl border border-theme-card-border bg-white px-2 py-3 text-center flex flex-col gap-1"
             >
-              <p className="text-xs text-theme-dark-text/60">{level} уровень</p>
+              <p className="text-xs text-theme-dark-text/60">{t('guild.levelLabel', { level })}</p>
               <p className="text-lg font-bold text-theme-dark-text">
                 {loading ? '…' : countsByLevel[level] ?? 0}
               </p>
@@ -156,11 +156,11 @@ function Guild() {
       </div>
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Приглашённые игроки</h3>
+        <h3 className="font-semibold text-base">{t('guild.invitedPlayers')}</h3>
         {loading ? (
-          <p className="text-sm text-theme-dark-text/70">Загрузка…</p>
+          <p className="text-sm text-theme-dark-text/70">{t('guild.loading')}</p>
         ) : referrals.length === 0 ? (
-          <p className="text-sm text-theme-dark-text/70">Пока никого не пригласили.</p>
+          <p className="text-sm text-theme-dark-text/70">{t('guild.noInvites')}</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {referrals.map((ref) => (
@@ -170,7 +170,7 @@ function Guild() {
               >
                 <span className="truncate">{displayName(ref)}</span>
                 <span className="shrink-0 text-xs font-medium text-theme-accent bg-theme-accent/10 px-2 py-1 rounded-full">
-                  {ref.level} ур.
+                  {t('guild.levelShort', { level: ref.level })}
                 </span>
               </li>
             ))}

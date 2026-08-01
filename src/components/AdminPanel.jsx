@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
@@ -29,6 +30,7 @@ function normalizeChannelLink(input) {
 }
 
 function AdminPanel() {
+  const { t } = useLanguage()
   const [withdrawals, setWithdrawals] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
@@ -99,8 +101,8 @@ function AdminPanel() {
         body: { withdrawal_id: withdrawal.id },
       })
       if (fnErr) throw fnErr
-      if (!data?.success) throw new Error(data?.message ?? 'Не удалось отправить выплату')
-      setNotice('Выплата отправлена, заявка подтверждена')
+      if (!data?.success) throw new Error(data?.message ?? t('admin.approveError'))
+      setNotice(t('admin.approveSuccess'))
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -118,7 +120,7 @@ function AdminPanel() {
         p_withdrawal_id: withdrawal.id,
       })
       if (rpcErr) throw rpcErr
-      setNotice('Заявка отклонена, средства возвращены игроку')
+      setNotice(t('admin.rejectSuccess'))
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -131,7 +133,7 @@ function AdminPanel() {
     if (!tg) return
 
     tg.showConfirm(
-      'Точно хотите сбросить сезон? Это действие необратимо.',
+      t('admin.resetConfirm'),
       async (confirmed) => {
         if (!confirmed) return
         setResetBusy(true)
@@ -140,7 +142,7 @@ function AdminPanel() {
         try {
           const { error: rpcErr } = await supabase.rpc('reset_season_admin')
           if (rpcErr) throw rpcErr
-          setNotice('Сезон сброшен')
+          setNotice(t('admin.resetDone'))
           await refresh()
         } catch (err) {
           setError(err.message)
@@ -154,7 +156,7 @@ function AdminPanel() {
   async function handleCreateTask() {
     const link = normalizeChannelLink(taskLink)
     if (!taskTitle.trim() || !link) {
-      setError('Укажите название и ссылку вида https://t.me/username или @username')
+      setError(t('admin.createTaskValidation'))
       return
     }
 
@@ -169,7 +171,7 @@ function AdminPanel() {
       })
       if (rpcErr) throw rpcErr
 
-      setNotice('Задание создано')
+      setNotice(t('admin.taskCreated'))
       setTaskTitle('')
       setTaskReward('')
       setTaskLink('')
@@ -189,7 +191,7 @@ function AdminPanel() {
       !Number.isFinite(Number(minWithdrawal)) ||
       !Number.isFinite(Number(feeRatePercent))
     ) {
-      setError('Настройки ещё не загружены — подождите и попробуйте снова')
+      setError(t('admin.settingsNotLoaded'))
       return
     }
 
@@ -214,7 +216,7 @@ function AdminPanel() {
         if (rpcErr) throw rpcErr
       }
 
-      setNotice('Настройки сохранены')
+      setNotice(t('admin.settingsSaved'))
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -227,7 +229,7 @@ function AdminPanel() {
     const telegramId = Number(creditTelegramId)
     const amount = Number(creditAmount)
     if (!telegramId || !amount) {
-      setError('Укажите корректные Telegram ID и сумму')
+      setError(t('admin.creditValidation'))
       return
     }
 
@@ -241,7 +243,7 @@ function AdminPanel() {
       })
       if (rpcErr) throw rpcErr
 
-      setNotice(`Начислено ${amount} GRAM игроку ${telegramId}`)
+      setNotice(t('admin.creditSuccess', { amount, id: telegramId }))
       setCreditTelegramId('')
       setCreditAmount('')
     } catch (err) {
@@ -254,12 +256,12 @@ function AdminPanel() {
   return (
     <div className="flex flex-col gap-4 text-left">
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Новое задание</h3>
+        <h3 className="font-semibold text-base">{t('admin.newTask')}</h3>
         <input
           type="text"
           value={taskTitle}
           onChange={(e) => setTaskTitle(e.target.value)}
-          placeholder="Название задания"
+          placeholder={t('admin.taskTitlePlaceholder')}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         <input
@@ -268,14 +270,14 @@ function AdminPanel() {
           step="0.01"
           value={taskReward}
           onChange={(e) => setTaskReward(e.target.value)}
-          placeholder="Награда, GRAM"
+          placeholder={t('admin.taskRewardPlaceholder')}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         <input
           type="text"
           value={taskLink}
           onChange={(e) => setTaskLink(e.target.value)}
-          placeholder="https://t.me/username или @username"
+          placeholder={t('admin.taskLinkPlaceholder')}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         <button
@@ -284,28 +286,28 @@ function AdminPanel() {
           disabled={taskBusy}
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {taskBusy ? 'Создание…' : 'Создать задание'}
+          {taskBusy ? t('admin.creating') : t('admin.createTask')}
         </button>
       </div>
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-base">Управление сезоном</h3>
+          <h3 className="font-semibold text-base">{t('admin.seasonManagement')}</h3>
           <button
             type="button"
             onClick={handleResetSeason}
             disabled={resetBusy}
             className="rounded-2xl px-3 py-2 text-sm font-semibold bg-red-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {resetBusy ? 'Сброс…' : 'Сбросить сезон'}
+            {resetBusy ? t('admin.resetting') : t('admin.resetSeason')}
           </button>
         </div>
       </div>
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Настройки</h3>
+        <h3 className="font-semibold text-base">{t('admin.settings')}</h3>
         <label className="text-xs text-theme-dark-text/60">
-          Мин. сумма вывода, GRAM
+          {t('admin.minWithdrawalLabel')}
           <input
             type="number"
             min="0"
@@ -316,7 +318,7 @@ function AdminPanel() {
           />
         </label>
         <label className="text-xs text-theme-dark-text/60">
-          Комиссия вывода, %
+          {t('admin.feeRateLabel')}
           <input
             type="number"
             min="0"
@@ -328,7 +330,7 @@ function AdminPanel() {
           />
         </label>
         <label className="text-xs text-theme-dark-text/60">
-          Конец сезона
+          {t('admin.seasonEndLabel')}
           <input
             type="datetime-local"
             value={seasonEndAt}
@@ -342,18 +344,18 @@ function AdminPanel() {
           disabled={settingsBusy || loading}
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {settingsBusy ? 'Сохранение…' : 'Сохранить настройки'}
+          {settingsBusy ? t('admin.saving') : t('admin.saveSettings')}
         </button>
       </div>
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Выдать баланс</h3>
+        <h3 className="font-semibold text-base">{t('admin.grantBalance')}</h3>
         <input
           type="text"
           inputMode="numeric"
           value={creditTelegramId}
           onChange={(e) => setCreditTelegramId(e.target.value)}
-          placeholder="Telegram ID игрока"
+          placeholder={t('admin.telegramIdPlaceholder')}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         <input
@@ -361,7 +363,7 @@ function AdminPanel() {
           step="0.01"
           value={creditAmount}
           onChange={(e) => setCreditAmount(e.target.value)}
-          placeholder="Сумма, GRAM"
+          placeholder={t('admin.amountPlaceholder')}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         <button
@@ -370,7 +372,7 @@ function AdminPanel() {
           disabled={creditBusy}
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {creditBusy ? 'Начисление…' : 'Начислить'}
+          {creditBusy ? t('admin.crediting') : t('admin.credit')}
         </button>
       </div>
 
@@ -386,11 +388,11 @@ function AdminPanel() {
       )}
 
       <div className="flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Заявки на вывод</h3>
+        <h3 className="font-semibold text-base">{t('admin.withdrawalRequests')}</h3>
         {loading ? (
-          <p className="text-sm text-theme-dark-text/70">Загрузка заявок…</p>
+          <p className="text-sm text-theme-dark-text/70">{t('admin.loadingRequests')}</p>
         ) : withdrawals.length === 0 ? (
-          <p className="text-sm text-theme-dark-text/70">Нет заявок в ожидании.</p>
+          <p className="text-sm text-theme-dark-text/70">{t('admin.noRequests')}</p>
         ) : (
           withdrawals.map((w) => {
             const isBusy = busyId === w.id
@@ -400,21 +402,21 @@ function AdminPanel() {
                 className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-2"
               >
                 <p className="text-sm">
-                  <span className="text-theme-dark-text/60">Telegram ID: </span>
+                  <span className="text-theme-dark-text/60">{t('admin.telegramIdField')}</span>
                   <span className="font-semibold">{w.user_id}</span>
                 </p>
                 <p className="text-sm">
-                  <span className="text-theme-dark-text/60">Запрошено: </span>
+                  <span className="text-theme-dark-text/60">{t('admin.requestedField')}</span>
                   <span className="font-semibold">{w.amount_gram} GRAM</span>
                 </p>
                 <p className="text-sm">
                   <span className="text-theme-dark-text/60">
-                    К выплате (-{Math.round((1 - w.final_amount / w.amount_gram) * 100)}%):{' '}
+                    {t('admin.payoutField', { percent: Math.round((1 - w.final_amount / w.amount_gram) * 100) })}
                   </span>
                   <span className="font-semibold text-theme-accent">{w.final_amount} GRAM</span>
                 </p>
                 <p className="text-sm break-all">
-                  <span className="text-theme-dark-text/60">Кошелёк: </span>
+                  <span className="text-theme-dark-text/60">{t('admin.walletField')}</span>
                   <span className="font-mono text-xs">{w.wallet_address}</span>
                 </p>
 
@@ -425,7 +427,7 @@ function AdminPanel() {
                     onClick={() => handleApprove(w)}
                     className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    {isBusy ? 'Отправка…' : 'Подтвердить'}
+                    {isBusy ? t('admin.sending') : t('admin.confirm')}
                   </button>
                   <button
                     type="button"
@@ -433,7 +435,7 @@ function AdminPanel() {
                     onClick={() => handleReject(w)}
                     className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Отклонить
+                    {t('admin.reject')}
                   </button>
                 </div>
               </div>

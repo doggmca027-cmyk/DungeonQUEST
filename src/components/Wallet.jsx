@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react'
 import { beginCell } from '@ton/core'
 import { supabase } from '../supabaseClient'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
@@ -22,6 +23,7 @@ function wait(ms) {
 }
 
 function Wallet() {
+  const { t } = useLanguage()
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const tonAddress = useTonAddress()
   const [tonConnectUI] = useTonConnectUI()
@@ -132,12 +134,12 @@ function Wallet() {
         }
         if (cancelled) return
         setVerifying(true)
-        setNotice('Проверяем зачисление предыдущей транзакции…')
+        setNotice(t('wallet.resumeCheckNotice'))
         const credited = await pollForDeposit(amount, submittedAt)
         if (cancelled) return
         if (credited) {
           localStorage.removeItem(PENDING_DEPOSIT_KEY)
-          setNotice(`Баланс пополнен на ${amount} GRAM`)
+          setNotice(t('wallet.depositCredited', { amount }))
           await refreshBalance()
         } else {
           setNotice(null)
@@ -153,6 +155,8 @@ function Wallet() {
     return () => {
       cancelled = true
     }
+    // t intentionally omitted -- re-running the resumed-deposit check on language toggle would re-poll
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, pollForDeposit, refreshBalance])
 
   useEffect(() => {
@@ -192,22 +196,22 @@ function Wallet() {
           },
         ],
       })
-      if (!result?.boc) throw new Error('Транзакция не была отправлена')
+      if (!result?.boc) throw new Error(t('wallet.txNotSent'))
 
       const submittedAt = Date.now()
       localStorage.setItem(PENDING_DEPOSIT_KEY, JSON.stringify({ amount, submittedAt }))
       setVerifying(true)
-      setNotice('Транзакция отправлена в сеть, проверяем зачисление…')
+      setNotice(t('wallet.txSentNotice'))
 
       const credited = await pollForDeposit(amount, submittedAt)
 
       if (credited) {
         localStorage.removeItem(PENDING_DEPOSIT_KEY)
-        setNotice(`Баланс пополнен на ${amount} GRAM`)
+        setNotice(t('wallet.depositCredited', { amount }))
         setDepositAmount('')
         await refreshBalance()
       } else {
-        setNotice('Транзакция ещё обрабатывается сетью — баланс обновится автоматически')
+        setNotice(t('wallet.txProcessingNotice'))
       }
     } catch (err) {
       setError(err.message)
@@ -221,7 +225,7 @@ function Wallet() {
     const amount = Number(withdrawAmount)
     if (!user || !amount) return
     if (amount < minWithdrawal) {
-      setError(`Минимальная сумма вывода — ${minWithdrawal} GRAM`)
+      setError(t('wallet.minWithdrawError', { min: minWithdrawal }))
       return
     }
 
@@ -234,7 +238,7 @@ function Wallet() {
       })
       if (rpcErr) throw rpcErr
 
-      setNotice('Заявка на вывод создана и ожидает обработки')
+      setNotice(t('wallet.withdrawRequested'))
       setWithdrawAmount('')
       await refreshBalance()
     } catch (err) {
@@ -250,9 +254,7 @@ function Wallet() {
 
   if (!user) {
     return (
-      <p className="text-sm text-theme-dark-text/70">
-        Откройте приложение через Telegram, чтобы управлять кошельком.
-      </p>
+      <p className="text-sm text-theme-dark-text/70">{t('wallet.openInTelegram')}</p>
     )
   }
 
@@ -260,11 +262,11 @@ function Wallet() {
     <div className="flex flex-col gap-4 text-left">
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-base">Кошелёк</h3>
+          <h3 className="font-semibold text-base">{t('wallet.title')}</h3>
           <TonConnectButton />
         </div>
         <p className="text-sm text-theme-dark-text/70">
-          Баланс: {loading ? '…' : `${balance} GRAM`}
+          {t('wallet.balance', { amount: loading ? '…' : `${balance} GRAM` })}
         </p>
       </div>
 
@@ -280,14 +282,14 @@ function Wallet() {
       )}
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Пополнение</h3>
+        <h3 className="font-semibold text-base">{t('wallet.deposit')}</h3>
         <input
           type="number"
           min="0"
           step="0.01"
           value={depositAmount}
           onChange={(e) => setDepositAmount(e.target.value)}
-          placeholder="Сумма в TON"
+          placeholder={t('wallet.depositPlaceholder')}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         <button
@@ -296,29 +298,27 @@ function Wallet() {
           disabled={!tonAddress || depositBusy || !Number(depositAmount)}
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {verifying ? 'Проверяем зачисление…' : depositBusy ? 'Отправка…' : 'Пополнить'}
+          {verifying ? t('wallet.depositBtnVerifying') : depositBusy ? t('wallet.depositBtnSending') : t('wallet.depositBtn')}
         </button>
         {!tonAddress && (
-          <p className="text-xs text-theme-dark-text/60">
-            Подключите кошелёк, чтобы пополнить баланс.
-          </p>
+          <p className="text-xs text-theme-dark-text/60">{t('wallet.connectWalletHint')}</p>
         )}
       </div>
 
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
-        <h3 className="font-semibold text-base">Вывод</h3>
+        <h3 className="font-semibold text-base">{t('wallet.withdraw')}</h3>
         <input
           type="number"
           min={minWithdrawal}
           step="0.01"
           value={withdrawAmount}
           onChange={(e) => setWithdrawAmount(e.target.value)}
-          placeholder={`Сумма в GRAM (мин. ${minWithdrawal})`}
+          placeholder={t('wallet.withdrawPlaceholder', { min: minWithdrawal })}
           className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
         />
         {withdrawAmountNumber > 0 && (
           <p className="text-xs text-theme-dark-text/60">
-            Комиссия {Math.round(feeRate * 100)}% · к выплате: {withdrawFinalAmount.toFixed(2)} GRAM
+            {t('wallet.feeInfo', { fee: Math.round(feeRate * 100), amount: withdrawFinalAmount.toFixed(2) })}
           </p>
         )}
         <button
@@ -327,7 +327,7 @@ function Wallet() {
           disabled={withdrawBusy || withdrawAmountNumber < minWithdrawal}
           className="rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {withdrawBusy ? 'Отправка…' : 'Вывести'}
+          {withdrawBusy ? t('wallet.withdrawBtnSending') : t('wallet.withdrawBtn')}
         </button>
       </div>
     </div>

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ExternalLink, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 function Tasks() {
+  const { t } = useLanguage()
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [tasks, setTasks] = useState([])
   const [completedIds, setCompletedIds] = useState(() => new Set())
@@ -71,7 +73,7 @@ function Tasks() {
       )
       if (verifyErr) throw verifyErr
       if (!verifyData?.subscribed) {
-        throw new Error(verifyData?.message ?? 'Вы не подписаны на канал')
+        throw new Error(verifyData?.message ?? t('tasks.notSubscribed'))
       }
 
       const { data: reward, error: rpcErr } = await supabase.rpc('complete_task', {
@@ -79,7 +81,7 @@ function Tasks() {
       })
       if (rpcErr) throw rpcErr
 
-      setNotice(`Задание выполнено: +${reward} GRAM`)
+      setNotice(t('tasks.taskCompleted', { reward }))
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -90,9 +92,7 @@ function Tasks() {
 
   if (!user) {
     return (
-      <p className="text-sm text-theme-dark-text/70">
-        Откройте приложение через Telegram, чтобы выполнять задания.
-      </p>
+      <p className="text-sm text-theme-dark-text/70">{t('tasks.openInTelegram')}</p>
     )
   }
 
@@ -110,9 +110,9 @@ function Tasks() {
       )}
 
       {loading ? (
-        <p className="text-sm text-theme-dark-text/70">Загрузка заданий…</p>
+        <p className="text-sm text-theme-dark-text/70">{t('tasks.loading')}</p>
       ) : tasks.length === 0 ? (
-        <p className="text-sm text-theme-dark-text/70">Заданий пока нет.</p>
+        <p className="text-sm text-theme-dark-text/70">{t('tasks.none')}</p>
       ) : (
         tasks.map((task) => {
           const isCompleted = completedIds.has(task.id)
@@ -138,7 +138,7 @@ function Tasks() {
                   className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card"
                 >
                   <ExternalLink size={16} />
-                  Перейти в канал
+                  {t('tasks.goToChannel')}
                 </a>
                 <button
                   type="button"
@@ -149,12 +149,12 @@ function Tasks() {
                   {isCompleted ? (
                     <>
                       <CheckCircle2 size={16} />
-                      Выполнено
+                      {t('tasks.completed')}
                     </>
                   ) : isBusy ? (
-                    'Проверка…'
+                    t('tasks.checking')
                   ) : (
-                    'Проверить'
+                    t('tasks.check')
                   )}
                 </button>
               </div>

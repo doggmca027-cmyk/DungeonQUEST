@@ -1,29 +1,36 @@
-import { useEffect, useState } from 'react'
-import { Home as HomeIcon, Swords, ClipboardList, Wallet as WalletIcon, Users, ShieldAlert } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Home as HomeIcon, Swords, ClipboardList, Wallet as WalletIcon, Users, ShieldAlert, Languages } from 'lucide-react'
 import { supabase, setAuthToken } from './supabaseClient'
-import Home from './components/Home.jsx'
-import DungeonList from './components/DungeonList.jsx'
-import Wallet from './components/Wallet.jsx'
-import Guild from './components/Guild.jsx'
-import Tasks from './components/Tasks.jsx'
-import AdminPanel from './components/AdminPanel.jsx'
+import { useLanguage } from './i18n/LanguageContext.jsx'
 import SupportButton from './components/SupportButton.jsx'
+
+const Home = lazy(() => import('./components/Home.jsx'))
+const DungeonList = lazy(() => import('./components/DungeonList.jsx'))
+const Wallet = lazy(() => import('./components/Wallet.jsx'))
+const Guild = lazy(() => import('./components/Guild.jsx'))
+const Tasks = lazy(() => import('./components/Tasks.jsx'))
+const AdminPanel = lazy(() => import('./components/AdminPanel.jsx'))
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
 const ADMIN_TG_ID = import.meta.env.VITE_ADMIN_TG_ID
 
-const TABS = [
-  { id: 'home', label: 'Главная', icon: HomeIcon },
-  { id: 'expedition', label: 'Поход', icon: Swords },
-  { id: 'quests', label: 'Задания', icon: ClipboardList },
-  { id: 'wallet', label: 'Кошелёк', icon: WalletIcon },
-  { id: 'guild', label: 'Гильдия', icon: Users },
-]
-
-const ADMIN_TAB = { id: 'admin', label: 'Админ-панель', icon: ShieldAlert }
+function LanguageToggle() {
+  const { language, toggleLanguage } = useLanguage()
+  return (
+    <button
+      type="button"
+      onClick={toggleLanguage}
+      className="shrink-0 flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-card border border-theme-card-border text-theme-accent"
+    >
+      <Languages size={18} />
+      {language === 'ru' ? 'EN' : 'RU'}
+    </button>
+  )
+}
 
 function App() {
+  const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState('home')
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [referralId] = useState(() => {
@@ -57,7 +64,7 @@ function App() {
       })
       if (cancelled) return
       if (error || !data?.token) {
-        setRegisterError(error?.message ?? data?.error ?? 'Не удалось авторизоваться')
+        setRegisterError(error?.message ?? data?.error ?? t('app.authError'))
         return
       }
       setAuthToken(data.token)
@@ -69,32 +76,45 @@ function App() {
     return () => {
       cancelled = true
     }
+    // t intentionally omitted -- re-running auth on language toggle would re-fire the request
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   const isAdmin = verifiedUser && ADMIN_TG_ID && String(verifiedUser.id) === ADMIN_TG_ID
 
+  const TABS = [
+    { id: 'home', label: t('app.tabs.home'), icon: HomeIcon },
+    { id: 'expedition', label: t('app.tabs.expedition'), icon: Swords },
+    { id: 'quests', label: t('app.tabs.quests'), icon: ClipboardList },
+    { id: 'wallet', label: t('app.tabs.wallet'), icon: WalletIcon },
+    { id: 'guild', label: t('app.tabs.guild'), icon: Users },
+  ]
+  const ADMIN_TAB = { id: 'admin', label: t('app.tabs.admin'), icon: ShieldAlert }
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS
 
   return (
     <div className="min-h-screen bg-theme-bg flex flex-col text-theme-dark-text">
       <header className="px-4 pt-6 pb-4">
         <div className="flex items-start justify-between gap-2">
-          <h1 className="text-2xl font-bold">DungeonQuest</h1>
-          <SupportButton />
+          <h1 className="text-2xl font-bold">{t('app.title')}</h1>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <SupportButton />
+          </div>
         </div>
         {user ? (
           <p className="mt-1 text-sm text-theme-dark-text/70">
-            Привет, {user.first_name}
-            {user.username ? ` (@${user.username})` : ''}!
+            {t('app.greeting', {
+              name: user.first_name,
+              username: user.username ? t('app.usernameSuffix', { username: user.username }) : '',
+            })}
           </p>
         ) : (
-          <p className="mt-1 text-sm text-theme-dark-text/70">
-            Откройте приложение через Telegram, чтобы авторизоваться
-          </p>
+          <p className="mt-1 text-sm text-theme-dark-text/70">{t('app.openInTelegram')}</p>
         )}
         {referralId && (
           <p className="mt-1 text-xs text-theme-dark-text/60">
-            Приглашён игроком #{referralId}
+            {t('app.invitedBy', { id: referralId })}
           </p>
         )}
         {registerError && (
@@ -106,19 +126,23 @@ function App() {
 
       <main className="flex-1 px-4 pb-24">
         {user && !registered && !registerError ? (
-          <p className="text-sm text-theme-dark-text/70">Загрузка профиля…</p>
-        ) : activeTab === 'expedition' ? (
-          <DungeonList />
-        ) : activeTab === 'quests' ? (
-          <Tasks />
-        ) : activeTab === 'wallet' ? (
-          <Wallet />
-        ) : activeTab === 'guild' ? (
-          <Guild />
-        ) : activeTab === 'admin' ? (
-          <AdminPanel />
+          <p className="text-sm text-theme-dark-text/70">{t('app.loadingProfile')}</p>
         ) : (
-          <Home onNavigateToExpedition={() => setActiveTab('expedition')} />
+          <Suspense fallback={<p className="text-sm text-theme-dark-text/70">{t('app.loading')}</p>}>
+            {activeTab === 'expedition' ? (
+              <DungeonList />
+            ) : activeTab === 'quests' ? (
+              <Tasks />
+            ) : activeTab === 'wallet' ? (
+              <Wallet />
+            ) : activeTab === 'guild' ? (
+              <Guild />
+            ) : activeTab === 'admin' ? (
+              <AdminPanel />
+            ) : (
+              <Home onNavigateToExpedition={() => setActiveTab('expedition')} />
+            )}
+          </Suspense>
         )}
       </main>
 

@@ -1,4 +1,5 @@
 import { Headset } from 'lucide-react'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
@@ -23,6 +24,7 @@ function handleSupportClick() {
 }
 
 function SupportButton() {
+  const { t } = useLanguage()
   return (
     <button
       type="button"
@@ -30,7 +32,7 @@ function SupportButton() {
       className="shrink-0 flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-card border border-theme-card-border text-theme-accent"
     >
       <Headset size={18} />
-      Поддержка
+      {t('supportButton.label')}
     </button>
   )
 }

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const tg = typeof window !== 'undefined' && window.Telegram?.WebApp
 
-function formatCountdown(ms) {
-  if (ms <= 0) return 'Поход завершён'
+function formatCountdown(ms, t) {
+  if (ms <= 0) return t('dungeonList.expeditionComplete')
   const totalSeconds = Math.floor(ms / 1000)
   const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
   const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
@@ -13,6 +14,7 @@ function formatCountdown(ms) {
 }
 
 function DungeonList() {
+  const { t } = useLanguage()
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [dungeons, setDungeons] = useState([])
   const [expeditions, setExpeditions] = useState([])
@@ -57,7 +59,7 @@ function DungeonList() {
         await refresh()
       } catch (err) {
         console.error('Failed to load dungeons:', err)
-        if (!cancelled) setError(err.message ?? 'Не удалось загрузить подземелья')
+        if (!cancelled) setError(err.message ?? t('dungeonList.loadError'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -67,6 +69,8 @@ function DungeonList() {
     return () => {
       cancelled = true
     }
+    // t intentionally omitted -- re-running the load on language toggle would re-fire the request
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh])
 
   const expeditionGroups = useMemo(() => {
@@ -94,7 +98,7 @@ function DungeonList() {
         p_count: 1,
       })
       if (rpcErr) throw rpcErr
-      if (!data?.success) throw new Error(data?.message ?? 'Не удалось отправиться в поход')
+      if (!data?.success) throw new Error(data?.message ?? t('dungeonList.enterError'))
 
       await refresh()
     } catch (err) {
@@ -113,7 +117,7 @@ function DungeonList() {
           p_expedition_id: expedition.id,
         })
         if (rpcErr) throw rpcErr
-        if (!data?.success) throw new Error(data?.message ?? 'Не удалось забрать лут')
+        if (!data?.success) throw new Error(data?.message ?? t('dungeonList.claimError'))
       }
 
       await refresh()
@@ -126,9 +130,7 @@ function DungeonList() {
 
   if (!user) {
     return (
-      <p className="text-sm text-theme-dark-text/70">
-        Откройте приложение через Telegram, чтобы отправляться в походы.
-      </p>
+      <p className="text-sm text-theme-dark-text/70">{t('dungeonList.openInTelegram')}</p>
     )
   }
 
@@ -141,10 +143,10 @@ function DungeonList() {
       )}
 
       {loading ? (
-        <p className="text-sm text-theme-dark-text/70">Загрузка подземелий…</p>
+        <p className="text-sm text-theme-dark-text/70">{t('dungeonList.loading')}</p>
       ) : dungeons.length === 0 ? (
         <div className="bg-theme-card border border-theme-card-border rounded-2xl p-5 text-center">
-          <p className="text-sm text-theme-dark-text/70">Нет доступных подземелий</p>
+          <p className="text-sm text-theme-dark-text/70">{t('dungeonList.noneAvailable')}</p>
         </div>
       ) : (
         dungeons.map((dungeon) => {
@@ -168,28 +170,28 @@ function DungeonList() {
                 <h3 className="font-semibold text-base">{dungeon.name}</h3>
                 {activeCount > 0 && (
                   <span className="shrink-0 text-xs font-medium text-theme-accent bg-theme-accent/10 px-2.5 py-1 rounded-full">
-                    Активно походов: {activeCount}
+                    {t('dungeonList.activeCount', { count: activeCount })}
                   </span>
                 )}
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center rounded-full bg-theme-bg/15 border border-theme-card-border px-3 py-1 text-xs font-medium text-theme-accent">
-                  Поход за {dungeon.entry_cost_gram} GRAM
+                  {t('dungeonList.entryCost', { cost: dungeon.entry_cost_gram })}
                 </span>
                 <span className="inline-flex items-center rounded-full bg-theme-bg/15 border border-theme-card-border px-3 py-1 text-xs font-medium text-theme-accent">
-                  {dungeon.duration_hours} часов в пути
+                  {t('dungeonList.duration', { hours: dungeon.duration_hours })}
                 </span>
                 <span className="inline-flex items-center rounded-full bg-theme-bg/15 border border-theme-card-border px-3 py-1 text-xs font-medium text-theme-accent">
-                  Прибыль: +{profitPercent}%
+                  {t('dungeonList.profit', { percent: profitPercent })}
                 </span>
               </div>
 
               {group.length > 0 && (
                 <p className="text-xs text-theme-dark-text/70">
                   {readyToClaim
-                    ? `Лут ждёт: ${totalReward} GRAM`
-                    : `В пути, осталось: ${formatCountdown(msLeft)}`}
+                    ? t('dungeonList.lootWaiting', { amount: totalReward })
+                    : t('dungeonList.inProgress', { time: formatCountdown(msLeft, t) })}
                 </p>
               )}
 
@@ -200,7 +202,7 @@ function DungeonList() {
                   onClick={() => handleEnter(dungeon)}
                   className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  В поход
+                  {t('dungeonList.enter')}
                 </button>
                 {group.length > 0 && (
                   <button
@@ -209,7 +211,7 @@ function DungeonList() {
                     onClick={() => handleClaim(dungeon.id, group)}
                     className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Забрать лут
+                    {t('dungeonList.claimLoot')}
                   </button>
                 )}
               </div>
