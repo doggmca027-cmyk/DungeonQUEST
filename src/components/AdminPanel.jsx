@@ -55,14 +55,25 @@ function AdminPanel() {
   const [broadcastText, setBroadcastText] = useState('')
   const [broadcastBusy, setBroadcastBusy] = useState(false)
 
+  const [ambassadorTelegramId, setAmbassadorTelegramId] = useState('')
+  const [ambassadorBusy, setAmbassadorBusy] = useState(false)
+  const [ambassadorStats, setAmbassadorStats] = useState([])
+
   const refresh = useCallback(async () => {
-    const [{ data, error: fetchErr }, { data: settingsData, error: settingsErr }] = await Promise.all([
+    const [
+      { data, error: fetchErr },
+      { data: settingsData, error: settingsErr },
+      { data: ambassadorData, error: ambassadorErr },
+    ] = await Promise.all([
       supabase.from('withdrawals').select('*').eq('status', 'pending'),
       supabase.from('app_settings').select('key, value'),
+      supabase.rpc('get_ambassador_stats'),
     ])
     if (fetchErr) throw fetchErr
     if (settingsErr) throw settingsErr
+    if (ambassadorErr) throw ambassadorErr
     setWithdrawals(data ?? [])
+    setAmbassadorStats(ambassadorData ?? [])
 
     const settings = Object.fromEntries((settingsData ?? []).map((row) => [row.key, row.value]))
     if (settings.min_withdrawal_gram) setMinWithdrawal(settings.min_withdrawal_gram)
@@ -281,6 +292,37 @@ function AdminPanel() {
     }
   }
 
+  async function handleSetAmbassador(isAmbassador) {
+    const telegramId = Number(ambassadorTelegramId)
+    if (!telegramId) {
+      setError(t('admin.ambassadorValidation'))
+      return
+    }
+
+    setAmbassadorBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const { error: rpcErr } = await supabase.rpc('admin_set_ambassador', {
+        p_target_telegram_id: telegramId,
+        p_is_ambassador: isAmbassador,
+      })
+      if (rpcErr) throw rpcErr
+
+      setNotice(
+        isAmbassador
+          ? t('admin.ambassadorAdded', { id: telegramId })
+          : t('admin.ambassadorRemoved', { id: telegramId }),
+      )
+      setAmbassadorTelegramId('')
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setAmbassadorBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 text-left">
       <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
@@ -421,6 +463,62 @@ function AdminPanel() {
         >
           {broadcastBusy ? t('admin.broadcasting') : t('admin.broadcastSend')}
         </button>
+      </div>
+
+      <div className="bg-theme-card border border-theme-card-border rounded-2xl p-4 flex flex-col gap-3">
+        <h3 className="font-semibold text-base">{t('admin.ambassadorTitle')}</h3>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={ambassadorTelegramId}
+          onChange={(e) => setAmbassadorTelegramId(e.target.value)}
+          placeholder={t('admin.telegramIdPlaceholder')}
+          className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm"
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => handleSetAmbassador(true)}
+            disabled={ambassadorBusy}
+            className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {ambassadorBusy ? t('admin.sending') : t('admin.ambassadorMark')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSetAmbassador(false)}
+            disabled={ambassadorBusy}
+            className="flex-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t('admin.ambassadorUnmark')}
+          </button>
+        </div>
+
+        {ambassadorStats.length > 0 && (
+          <div className="flex flex-col gap-2 mt-1">
+            {ambassadorStats.map((a) => (
+              <div
+                key={a.ambassador_id}
+                className="rounded-2xl border border-theme-card-border bg-white px-3 py-2 text-sm flex flex-col gap-1"
+              >
+                <p className="font-semibold">
+                  {a.username ? `@${a.username}` : a.first_name ?? `#${a.ambassador_id}`}
+                  <span className="font-normal text-theme-dark-text/60"> · #{a.ambassador_id}</span>
+                </p>
+                <p className="text-xs text-theme-dark-text/70">
+                  {t('admin.ambassadorLevel1Count', { count: a.level1_count })}
+                </p>
+                <p className="text-xs text-theme-dark-text/70">
+                  {t('admin.ambassadorDeposits', {
+                    l1: a.level1_deposits,
+                    l2: a.level2_deposits,
+                    l3: a.level3_deposits,
+                  })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (
