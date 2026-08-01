@@ -104,6 +104,9 @@ export const translations = {
       check: 'Проверить',
       notSubscribed: 'Вы не подписаны на канал',
       taskCompleted: 'Задание выполнено: +{{reward}} GRAM',
+      referralProgress: 'Приглашено: {{count}}/{{required}}',
+      notEnoughReferrals: 'Пока недостаточно приглашённых друзей 1 уровня',
+      claim: 'Забрать',
     },
     supportButton: {
       label: 'Поддержка',
@@ -257,6 +260,9 @@ export const translations = {
       check: 'Check',
       notSubscribed: "You're not subscribed to the channel",
       taskCompleted: 'Quest completed: +{{reward}} GRAM',
+      referralProgress: 'Invited: {{count}}/{{required}}',
+      notEnoughReferrals: 'Not enough level-1 invited friends yet',
+      claim: 'Claim',
     },
     supportButton: {
       label: 'Support',

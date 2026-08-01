@@ -10,6 +10,7 @@ function Tasks() {
   const [user] = useState(() => tg?.initDataUnsafe?.user ?? null)
   const [tasks, setTasks] = useState([])
   const [completedIds, setCompletedIds] = useState(() => new Set())
+  const [level1Count, setLevel1Count] = useState(0)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState(null)
@@ -30,14 +31,17 @@ function Tasks() {
     }
     if (tasksErr) throw tasksErr
 
-    const { data: userTasksData, error: userTasksErr } = await supabase
-      .from('user_tasks')
-      .select('task_id')
-      .eq('user_id', user.id)
+    const [{ data: userTasksData, error: userTasksErr }, { data: referralStats, error: referralErr }] =
+      await Promise.all([
+        supabase.from('user_tasks').select('task_id').eq('user_id', user.id),
+        supabase.rpc('get_referral_stats'),
+      ])
     if (userTasksErr) throw userTasksErr
+    if (referralErr) throw referralErr
 
     setTasks(tasksData ?? [])
     setCompletedIds(new Set((userTasksData ?? []).map((row) => row.task_id)))
+    setLevel1Count((referralStats ?? []).filter((r) => r.level === 1).length)
   }, [user])
 
   useEffect(() => {
@@ -90,6 +94,28 @@ function Tasks() {
     }
   }
 
+  async function handleCheckReferralTask(task) {
+    if (!user) return
+    setBusyId(task.id)
+    setError(null)
+    setNotice(null)
+    try {
+      const { data: reward, error: rpcErr } = await supabase.rpc('complete_referral_task', {
+        p_task_id: task.id,
+      })
+      if (rpcErr) throw rpcErr
+
+      setNotice(t('tasks.taskCompleted', { reward }))
+      await refresh()
+    } catch (err) {
+      setError(
+        err.message?.includes('not_enough_referrals') ? t('tasks.notEnoughReferrals') : err.message,
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   if (!user) {
     return (
       <p className="text-sm text-theme-dark-text/70">{t('tasks.openInTelegram')}</p>
@@ -117,6 +143,8 @@ function Tasks() {
         tasks.map((task) => {
           const isCompleted = completedIds.has(task.id)
           const isBusy = busyId === task.id
+          const isReferralTask = task.task_type === 'referral_count'
+          const referralReady = isReferralTask && level1Count >= task.required_referrals
 
           return (
             <div
@@ -130,34 +158,59 @@ function Tasks() {
                 </span>
               </div>
 
-              <div className="flex gap-2">
-                <a
-                  href={task.channel_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card"
-                >
-                  <ExternalLink size={16} />
-                  {t('tasks.goToChannel')}
-                </a>
-                <button
-                  type="button"
-                  disabled={isCompleted || isBusy}
-                  onClick={() => handleCheck(task)}
-                  className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isCompleted ? (
-                    <>
-                      <CheckCircle2 size={16} />
-                      {t('tasks.completed')}
-                    </>
-                  ) : isBusy ? (
-                    t('tasks.checking')
-                  ) : (
-                    t('tasks.check')
-                  )}
-                </button>
-              </div>
+              {isReferralTask ? (
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-sm text-theme-dark-text/70">
+                    {t('tasks.referralProgress', { count: level1Count, required: task.required_referrals })}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isCompleted || isBusy || !referralReady}
+                    onClick={() => handleCheckReferralTask(task)}
+                    className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isCompleted ? (
+                      <>
+                        <CheckCircle2 size={16} />
+                        {t('tasks.completed')}
+                      </>
+                    ) : isBusy ? (
+                      t('tasks.checking')
+                    ) : (
+                      t('tasks.claim')
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <a
+                    href={task.channel_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-dark-text text-theme-card"
+                  >
+                    <ExternalLink size={16} />
+                    {t('tasks.goToChannel')}
+                  </a>
+                  <button
+                    type="button"
+                    disabled={isCompleted || isBusy}
+                    onClick={() => handleCheck(task)}
+                    className="flex-1 flex items-center justify-center gap-1 rounded-2xl px-3 py-2 text-sm font-semibold bg-theme-accent text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isCompleted ? (
+                      <>
+                        <CheckCircle2 size={16} />
+                        {t('tasks.completed')}
+                      </>
+                    ) : isBusy ? (
+                      t('tasks.checking')
+                    ) : (
+                      t('tasks.check')
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )
         })
