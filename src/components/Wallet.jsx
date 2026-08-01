@@ -242,7 +242,11 @@ function Wallet() {
       setWithdrawAmount('')
       await refreshBalance()
     } catch (err) {
-      setError(err.message)
+      setError(
+        err.message?.includes('insufficient_withdrawable_balance')
+          ? t('wallet.insufficientWithdrawable')
+          : err.message,
+      )
     } finally {
       setWithdrawBusy(false)
     }

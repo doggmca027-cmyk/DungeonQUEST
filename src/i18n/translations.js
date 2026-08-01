@@ -78,6 +78,8 @@ export const translations = {
       txProcessingNotice: 'Транзакция ещё обрабатывается сетью — баланс обновится автоматически',
       minWithdrawError: 'Минимальная сумма вывода — {{min}} GRAM',
       withdrawRequested: 'Заявка на вывод создана и ожидает обработки',
+      insufficientWithdrawable:
+        'Для вывода доступны только средства с депозита, реферального дохода и наград за завершённые походы. Награды за задания и ежедневный бонус нужно сначала отыграть в подземелье.',
     },
     guild: {
       openInTelegram: 'Откройте приложение через Telegram, чтобы посмотреть гильдию.',
@@ -229,6 +231,8 @@ export const translations = {
       txProcessingNotice: 'Transaction is still processing — balance will update automatically',
       minWithdrawError: 'Minimum withdrawal amount is {{min}} GRAM',
       withdrawRequested: 'Withdrawal request created and pending processing',
+      insufficientWithdrawable:
+        'Only deposit funds, referral income, and completed-expedition rewards can be withdrawn. Task rewards and the daily bonus need to be wagered through a dungeon run first.',
     },
     guild: {
       openInTelegram: 'Open the app through Telegram to view the guild.',
